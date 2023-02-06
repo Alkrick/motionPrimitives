@@ -12,27 +12,46 @@
 
 #include "ProMP/ProMP.hpp"
 
-ProMP_ns::ProMP::ProMP(Eigen::MatrixXd &demoData, int bfNum, double bfStd, double phaseRate)
-:demoTraj_(demoData),bfNum_(bfNum),bfStd_(bfStd),phaseRate_(phaseRate)
+ProMP_ns::ProMP::ProMP(ProMP_Params& params)
 {
+    // Unpack params
+    demoTraj_ = params.demoData;
+    bfNum_ = params.bfNum;
+    bfStd_ = params.bfStd;
+    phaseRate_ = params.phaseRate;
+    savePath_ = params.savePath;
+    
     // Define Variables
-    demoNum_ = demoData.rows();
-    trajLen_ = demoData.cols();
-    DEBUG("demoNum = ",demoNum_);
-    DEBUG("trajLen = ",trajLen_);
+    trajLen_ = demoTraj_[0].rows();
+    jointNum_ = demoTraj_[0].cols();
+    demoNum_ = demoTraj_.size();
+    
     h_ = sqrt(2*M_PI)*bfStd_;
     bf_c_ = linspace(0,1,bfNum_);
-
+    
     // Combute phase and phi
     computePhase(phaseRate_);
     phi_ = generateBF(z_,trajLen_);
-    DEBUG("phi=\n",phi_);
+    PHI_ = computeDiagBlock(phi_);
+    
     // Learn from Demonstration
     learnMP(demoTraj_);
+    
+    // Save 
+    saveMP();
 }
 
 ProMP_ns::ProMP::ProMP(std::string MPfilepath)
 {
+    CSVReader reader(MPfilepath);
+    Eigen::MatrixXd MPdata = reader.getData();
+    std::vector<std::string> param = reader.getParamList();
+    bfNum_ = std::stod(param[1]);
+    jointNum_ = std::stod(param[2]);
+    trajLen_ = std::stod(param[3]);    
+    
+    omMean_ = MPdata.col(0);
+    omStd_ = MPdata.block(0,1,bfNum_*jointNum_,bfNum_*jointNum_);
 }
 
 void ProMP_ns::ProMP::setStart(double start, double std)
@@ -45,10 +64,6 @@ void ProMP_ns::ProMP::setGoal(double goal, double std)
     addViaPoint(1.0, goal, std);
 }
 
-void ProMP_ns::ProMP::setFilepath(std::string filepath)
-{
-}
-
 void ProMP_ns::ProMP::addViaPoint(double t, double pointPos, double std)
 {
     Eigen::Vector3d viaPoint;
@@ -58,41 +73,27 @@ void ProMP_ns::ProMP::addViaPoint(double t, double pointPos, double std)
     viaPoints_.push_back(viaPoint);
 }
 
-void ProMP_ns::ProMP::learnMP(Eigen::MatrixXd &dataset)
-{
-    double sig = 0.0000000000001;
-    Eigen::MatrixXd om(demoNum_,bfNum_);
-    Eigen::MatrixXd noise = sig * Eigen::MatrixXd::Identity(bfNum_,bfNum_);
-    
-    // Estimating Omega
-    for (int i = 0; i < dataset.rows(); i++)
-    {
-        auto c1 = (phi_*phi_.transpose()).inverse() + noise;
-        auto c2 = phi_*dataset.row(i).transpose();
-        om.row(i) = ((c1)*(c2)).transpose();
-    }
-    
-    // Mean of Omega
-    om_ = om;
-    omMean_ = om_.colwise().mean();
-    DEBUG("Omega= \n",omMean_);
-    // Standard Deviation of Omega
-    Eigen::MatrixXd cen = om_.rowwise() - om_.colwise().mean();
-    omStd_ = (cen.adjoint()*cen) / double(om_.rows()-1);
-    DEBUG("STD= \n",omStd_);
-    // Mean of Trajectory
-    meanTraj_ = dataset.colwise().mean();
-    startPoint_ = meanTraj_(0);
-    endPoint_ = meanTraj_(trajLen_ - 1);
-
-}
-
 void ProMP_ns::ProMP::computePhase(double phaseSpeed)
 {
     int timePoints = (int)(trajLen_/phaseSpeed);
     double dt = 1.0/trajLen_;
     Phase phase(dt,phaseSpeed,timePoints);
     z_ = phase.getPhase();
+}
+
+Eigen::MatrixXd ProMP_ns::ProMP::computeDiagBlock(Eigen::MatrixXd phi)
+{
+    int r = phi.rows();
+    int c = phi.cols();
+    Eigen::MatrixXd block(r*jointNum_,c*jointNum_);
+    block.setZero();
+	int j =0;
+	for (int i = 0; i < jointNum_; i++)
+	{
+		block.block(i*r,j*c,r,c) = phi;
+		j++;
+	}
+    return block;
 }
 
 Eigen::MatrixXd ProMP_ns::ProMP::gaussianBasis(Eigen::MatrixXd &z_c)
@@ -106,7 +107,7 @@ Eigen::MatrixXd ProMP_ns::ProMP::gaussianBasis(Eigen::MatrixXd &z_c)
         for (int j = 0; j < trajLen_; j++)
         {
             auto x = z_c(i,j);
-            phi(i,j) = std::exp(-0.5 * pow(x/bfStd_,2))/(sqrt(2*3.14)*bfStd_);
+            phi(i,j) = std::exp(-0.5 * pow(x/bfStd_,2))/h_;
         }
     }
     return phi;
@@ -116,6 +117,7 @@ Eigen::MatrixXd ProMP_ns::ProMP::vonMisesBasis(Eigen::MatrixXd &z_c)
 {
     assert(bfNum_==z_c.rows());
     assert(trajLen_==z_c.cols());
+
     Eigen::MatrixXd phi(bfNum_,trajLen_);
     for (int i = 0; i < bfNum_; i++)
     {
@@ -131,8 +133,7 @@ Eigen::MatrixXd ProMP_ns::ProMP::generateBF(Eigen::VectorXd &z, int trajLen)
 {
     Eigen::MatrixXd zMat = z.replicate(1,bfNum_).transpose();
     Eigen::MatrixXd cMat = bf_c_.replicate(1,trajLen);
-    DEBUG("zMAT=\n",zMat);
-    DEBUG("cMAT=\n",cMat);
+
     Eigen::MatrixXd z_c = zMat - cMat;
     Eigen::MatrixXd phi0(bfNum_,trajLen_);
     Eigen::VectorXd bfSum(bfNum_);
@@ -140,28 +141,22 @@ Eigen::MatrixXd ProMP_ns::ProMP::generateBF(Eigen::VectorXd &z, int trajLen)
     switch(basisType_)
     {
         case 0: 
-            DEBUG("case",0);
             phi0 = gaussianBasis(z_c).transpose();
-            DEBUG("sum",0);
             bfSum = phi0.rowwise().sum();
             break;
         
         case 1:
-            DEBUG("what",0);
             phi0 = vonMisesBasis(z_c).transpose();
             bfSum = phi0.rowwise().sum();
             break;
         
         default:
-            DEBUG("huh",0);
             phi0 = gaussianBasis(z_c).transpose();
             bfSum = phi0.rowwise().sum();
             break;
         
     }
 
-    DEBUG("PHI0=\n",phi0);
-    
     Eigen::MatrixXd phi(trajLen_,bfNum_);
     for (int i = 0; i < trajLen_; i++)
     {
@@ -170,11 +165,36 @@ Eigen::MatrixXd ProMP_ns::ProMP::generateBF(Eigen::VectorXd &z, int trajLen)
             phi(i,j) = phi0(i,j)/bfSum(i);
         }
     }
-    DEBUG("PHI=\n",phi.transpose());
     return phi.transpose();
 }
 
-Eigen::VectorXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
+void ProMP_ns::ProMP::learnMP(std::vector<Eigen::MatrixXd> &dataset)
+{
+    
+    double sig = 3e-7;
+    Eigen::MatrixXd om(demoNum_,bfNum_*jointNum_);
+    Eigen::MatrixXd noise = sig * Eigen::MatrixXd::Identity(bfNum_*jointNum_,bfNum_*jointNum_);
+    
+    auto c1 = (PHI_*PHI_.transpose()).inverse() + noise;
+    // Estimating Omega
+    for (int i = 0; i < dataset.size(); i++)
+    {
+        Eigen::MatrixXd traj = dataset[i];
+        traj.resize(trajLen_*jointNum_,1);
+        auto c2 = PHI_*traj;
+        om.row(i) = ((c1)*(c2)).transpose();        
+    }
+    
+    // Mean of Omega
+    om_ = om;
+    omMean_ = om_.colwise().mean();
+
+    // Standard Deviation of Omega
+    Eigen::MatrixXd cen = om_.rowwise() - omMean_.transpose();
+    omStd_ = (cen.adjoint()*cen) / double(om_.rows()-1);
+}
+
+Eigen::MatrixXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
 {
     double dt = 1.0/trajLen_;
     int timePoints = (int)(trajLen_/phaseRate_);
@@ -186,11 +206,10 @@ Eigen::VectorXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
     auto newZ_ = newPhase.getPhase();
 
     auto phi = generateBF(newZ_,trajLen_);
-    DEBUG("gen_phi= \n",phi);
+    auto PHI = computeDiagBlock(phi);
 
     for (int i = 0; i < viaPoints_.size(); i++)
     {
-        DEBUG("wah",0);
         auto z0 = newPhase.getPhaseFromTime(viaPoints_[i][0]);
         auto phiT = generateBF(z0,1);
 
@@ -206,21 +225,34 @@ Eigen::VectorXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
     }
 
     auto sampleOm = new_omMean;
-    auto y_t = phi.transpose() * sampleOm;
-    DEBUG("Omega Mean = \n",sampleOm);
-    DEBUG("PHI * Omega = \n",y_t);
+    Eigen::MatrixXd y_t = PHI.transpose() * sampleOm;
+    y_t.resize(trajLen_,jointNum_);
+    
 
     double dt0 = (trajLen_ - 1.0)/(desiredtrajLen);
-    Eigen::VectorXd genTraj(desiredtrajLen);
-    for (int i = 0; i < desiredtrajLen; i++)
-    {
-        genTraj(i) = y_t((int)(i*dt0));
+    Eigen::MatrixXd genTraj(desiredtrajLen,jointNum_);
+    for (int j=0; j < jointNum_; j++){
+        for (int i = 0; i < desiredtrajLen; i++){
+            genTraj(i,j) = y_t((int)(i*dt0),j);
+        }    
     }
     return genTraj;
 }
 
 void ProMP_ns::ProMP::saveMP()
 {
+    std::ofstream MPfile;
+    MPfile.open(savePath_+"MP.csv");
+    MPfile << std::scientific <<"#,"<< bfNum_ <<","<< jointNum_<<"," << trajLen_ << std::endl;
+    for(int i=0;i<jointNum_*bfNum_;i++){
+        int j=0;
+        MPfile << omMean_(i) << ",";
+        for(j=0;j< jointNum_*bfNum_-1;j++){
+            MPfile << "\t" << omStd_(i,j) << ","; 
+        }
+        MPfile << "\t" << omStd_(i,j) << std::endl;
+    }
+    MPfile.close();
 }
 
 void ProMP_ns::ProMP::loadMP(const std::string filepath)

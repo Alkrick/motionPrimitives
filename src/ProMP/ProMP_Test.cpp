@@ -13,53 +13,44 @@
 
 int main(int argc, char** argv)
 {
- 
-   std::vector<std::string> fileList;
-	std::string filePath = "/home/xuande/My/Workspaces/catkin_ws/src/trajectory_generation/data/";
+
+   	std::vector<std::string> fileList;
+	std::string filePath = "../testData/";
+
 	fileList.push_back(filePath + "example1.csv");
 	fileList.push_back(filePath + "example2.csv");
 	fileList.push_back(filePath + "example3.csv");
 	fileList.push_back(filePath + "example4.csv");
-   DEBUG("File=",0);
-	/**
-	* data handle object which takes in index of trajectory in .csv file and also the file list
-	*/
-	Dataset pelvisData(0,fileList);
-   DEBUG("dataset=",0);
+	
+	//Data handle object which takes in index of trajectory in .csv file and also the file list
+	Dataset testData(0,fileList);
+	
 	/// get required trajectory from all demonstrations into a single matrix
-	Eigen::MatrixXd dataBase1 = pelvisData.getData();	
-   DEBUG("dataBase=",0);
+	ProMP_ns::ProMP_Params options;
+	options.demoData = testData.getData();
+	options.savePath = filePath;
+
 	/// initialize promp object with number of basis functions and std as arguments.
-	ProMP_ns::ProMP baseMp(dataBase1,5,0.0286, 1.0);
-   DEBUG("MP=",0);
+	ProMP_ns::ProMP baseMp(options);
+
 	/// generate trajectory of required number of points with the generateTrajectory function.
-	Eigen::VectorXd vect = baseMp.generateTraj(100);
-   DEBUG("TrajGen= \n",vect);
-
-
+	Eigen::MatrixXd GenTraj = baseMp.generateTraj(300);
 
 	/// Below code is for writing all the data into an output.csv file for visualization.
 	std::ofstream myfile;
-	myfile.open ("./src/trajectory_generation/data/output.csv");
-	int j;
-	int k;
-	int plotlen;
-	if (vect.innerSize()>dataBase1.outerSize())
-		plotlen =vect.innerSize();
-	else
-		plotlen =dataBase1.outerSize();
-	for (int i=0;i<plotlen;++i){
-		if (i<dataBase1.outerSize())
-			j=i;
-		else 
-			j=dataBase1.outerSize()-1;
-
-		if (i<vect.innerSize())
-			k=i;
-		else 
-			k=vect.innerSize()-1;
-		myfile << dataBase1(0,j)<<","<<dataBase1(1,j)<<","<< dataBase1(2,j)<<","<< dataBase1(3,j)<<","<<vect(k)<<"\n";
+	myfile.open (filePath+"output.csv");
+	
+	for (int i=0;i<GenTraj.rows();++i)
+	{
+		int j;
+		for (j=0; j<GenTraj.cols()-1; j++){	
+			myfile <<GenTraj(i,j)<<",";
+		}
+		myfile <<GenTraj(i,j)<<std::endl;
 	}
 	myfile.close();
-   return 0;
+	
+	/// Load the MP that was just trained
+	ProMP_ns::ProMP loadMP(filePath+"MP.csv");
+	return 0;
 }

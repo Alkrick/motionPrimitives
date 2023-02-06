@@ -25,34 +25,41 @@ class CSVReader{
 private:
 	std::string fileName_;
 	std::string delimeter_; 
+	Eigen::MatrixXd data_;
+	std::vector<std::string> paramList_;
 	std::vector<std::vector<std::string> > dataList_;
 	std::vector<std::vector<double>> list;
 public:
-	CSVReader(std::string filename, std::string delm = ","):fileName_(filename), delimeter_(delm){ }
-	Eigen::MatrixXd getData(){
-	std::ifstream file(fileName_.c_str()); 
-	std::string line = "";
-	while (getline(file, line)){
-		std::vector<std::string> vec;
-		boost::algorithm::split(vec, line, boost::is_any_of(delimeter_));
-		dataList_.push_back(vec);
+	CSVReader(std::string filename, std::string delm = ","):fileName_(filename), delimeter_(delm){
+		std::ifstream file(fileName_.c_str()); 
+		std::string line = "";
+		while (getline(file, line)){
+			std::vector<std::string> vec;
+			boost::algorithm::split(vec, line, boost::is_any_of(delimeter_));
+			if(vec[0]!="#") dataList_.push_back(vec);
+			else paramList_ = vec;
 		}
-	file.close();	
-	for(std::vector<std::string> vec : dataList_){
-		std::vector<double> oneLine;
-		for(std::string data : vec){
-			oneLine.push_back(std::stod(data));
+		file.close();	
+		for(std::vector<std::string> vec : dataList_){
+			std::vector<double> oneLine;
+			for(std::string data : vec){
+				oneLine.push_back(std::stod(data));
 			}
-		list.push_back(oneLine);		
+			list.push_back(oneLine);		
 		}
-	Eigen::MatrixXd data(list.size(),list[0].size());
-	for (int row = 0; row < list.size(); ++row){
-   		for (int col = 0; col < list[0].size(); ++col){
-        	data(row,col) = list[row][col];
+		Eigen::MatrixXd data(list.size(),list[0].size());
+		for (int row = 0; row < list.size(); ++row){
+   			for (int col = 0; col < list[0].size(); ++col){
+        		data(row,col) = list[row][col];
    			}
 		}
-	return data;
+		data_ = data;
 	}
+
+	Eigen::MatrixXd getData(){
+		return data_;
+	}
+
 	Eigen::VectorXd get1Ddata(int index,Eigen::MatrixXd data_){
 	Eigen::VectorXd data(list.size());
 	for (int row = 0; row < data.innerSize(); ++row){   		
@@ -61,20 +68,27 @@ public:
 	return data;
 	}
 
+	std::vector<std::string> getParamList(){
+		return paramList_;
+	}
+
 };
 
 class Dataset{
 private:
-	/// approximate length
+	/// @brief approximate length.
 	int reqTrajLen_;
-	/// column number of desired trajectory in each csv file.
+	/// @brief column number of desired trajectory in each csv file.
 	int index_;
-	/// file names with trajectories for each demonstration.
+	/// @brief number of demonstrations in dataset
+	int demoNum_;
+	/// @brief number of joints in demonstration.
+	int jointNum_;
+	/// @brief file names with trajectories for each demonstration.
 	std::vector<std::string> fileList_;
-	/// std::vector of Eigen::VectorXd of trajectories
-	std::vector<Eigen::VectorXd> trajList_;
-	/// Eigen::Matrix of trajectories
-	Eigen::MatrixXd data_;
+	/// @brief Eigen::Matrix of trajectories.
+	std::vector<Eigen::MatrixXd> data_;
+
 public:
 	/** \brief				 handle data from multiple demonstrations
 	*	\param	reqTrajLen   required length of trajectory
@@ -82,28 +96,35 @@ public:
 	*	\param	fileList  	 vector of .csv file names	
 	*/
 	Dataset(int index,std::vector<std::string> fileList):index_(index),fileList_(fileList){
+		demoNum_ = fileList_.size();
 		std::vector<int> trjLens;
-		for(int i=0;i<fileList_.size();++i){
+		std::vector<Eigen::MatrixXd> demoData;
+		for(int i=0;i<demoNum_;++i){
 			CSVReader reader(fileList_[i]);
-			Eigen::VectorXd data = reader.get1Ddata(index_,reader.getData());
-			trjLens.push_back(data.innerSize());
-			trajList_.push_back(data);
+			demoData.push_back(reader.getData());
+			trjLens.push_back(demoData[i].rows());
 			}
+		jointNum_ = demoData[0].cols();
 		int minLen = *std::min_element(trjLens.begin(), trjLens.end());
 		reqTrajLen_=minLen;
 		double delta;
-		Eigen::MatrixXd data1(fileList_.size(),reqTrajLen_);
-		for(int i=0;i<trajList_.size();++i){			
-			delta = (trajList_[i].innerSize() - 1)*1.0/(reqTrajLen_-1);
-			for(int j=0;j<reqTrajLen_;++j){
-				data1(i,j)=trajList_[i]((int)(j*delta));
+		Eigen::MatrixXd data1(reqTrajLen_,jointNum_);
+		for(int k=0; k <demoNum_;k++)
+		{
+			for(int col=0;col<demoData[k].cols();++col){			
+
+				delta = (demoData[k].rows() - 1)*1.0/(reqTrajLen_-1);
+				for(int row=0;row<reqTrajLen_;++row){
+					data1(row,col)=demoData[k]((int)(row*delta),col);
 				}
 			}
-		data_= data1;
+			data_.push_back(data1);
 		}
+	}
+	
 	/** \brief	get required data
 	*/
-	Eigen::MatrixXd getData(){
+	std::vector<Eigen::MatrixXd> getData(){
 		return data_;
 		}
 };

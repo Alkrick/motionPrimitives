@@ -17,6 +17,7 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include "dataHandle.hpp"
 
 #define debugging_enabled 1
@@ -25,8 +26,18 @@
   if (debugging_enabled) { std::cerr << n << x << std::endl; } \
 } while (0)
 
-const std::string dataPath = "/home/xuande/My/Workspaces/catkin_ws/src/trajectory_generation/data/";
 namespace ProMP_ns{
+
+struct ProMP_Params{
+public:
+    std::vector<Eigen::MatrixXd> demoData;
+    std::string savePath;
+    int bfNum = 35; 
+    double bfStd = 0.0286; 
+    double phaseRate = 1.0;
+    ProMP_Params(){
+    };
+};
 class ProMP{
 public:
     /**
@@ -35,7 +46,7 @@ public:
      * @param bfNum         number of basis functions
      * @param bfStd         standard deviation
      */
-    ProMP(Eigen::MatrixXd& demoData, int bfNum, double bfStd, double phaseRate);
+    ProMP(ProMP_Params& params);
 
     /**
      * @brief Load an already trained ProMP from file 
@@ -61,13 +72,6 @@ public:
     void setGoal(double goal, double std);
 
     /**
-     * @brief Set the save Filepath for storing trained MP 
-     * 
-     * @param filepath 
-     */
-    void setFilepath(std::string filepath);
-
-    /**
      * @brief Add a via point to the trajectory
      * 
      * @param t         time of via point (0~1)
@@ -82,7 +86,7 @@ public:
      * @param trajLen trajectory length
      * @return Eigen::VectorXd trajectory
      */
-    Eigen::VectorXd generateTraj(int trajLen);
+    Eigen::MatrixXd generateTraj(int trajLen);
 
 private:
     // Number of Basis Functions
@@ -96,6 +100,9 @@ private:
 
     // Number of demos
     int demoNum_;
+
+    // Number of joints
+    int jointNum_;
 
     // Points in trajectory
     int trajLen_;
@@ -116,13 +123,16 @@ private:
     Eigen::VectorXd z_;
 
     // Demo trajectories
-    Eigen::MatrixXd demoTraj_;
+    std::vector<Eigen::MatrixXd> demoTraj_;
 
     // C vector of Basis functions
     Eigen::VectorXd bf_c_;
 
     // Basis functions
     Eigen::MatrixXd phi_;
+
+    // Block Matrix of Basis functions
+    Eigen::MatrixXd PHI_;
 
     // Weight Vector Omega
     Eigen::MatrixXd om_;
@@ -147,7 +157,14 @@ private:
      * 
      * @param dataset Demonstration trajectories
      */
-    void learnMP(Eigen::MatrixXd& dataset);
+    void learnMP(std::vector<Eigen::MatrixXd>& dataset);
+
+    /**
+     * @brief Computes Diagonal Block Matrix of phi(s)
+     * 
+     * @return Eigen::MatrixXd 
+     */
+    Eigen::MatrixXd computeDiagBlock(Eigen::MatrixXd);
 
     /** @brief	Computes phase
 	*	@param phaseSpeed PhaseSpeed < 1 slower than average trajectory 
