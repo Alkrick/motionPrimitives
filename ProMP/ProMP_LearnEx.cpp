@@ -1,21 +1,20 @@
 /**
- * @file ProMP_Test.cpp
+ * @file ProMP_LearnEx.cpp
  * @author Mohamed Al-Khulaqui (mohamed_alk@outlook.com)
- * @brief Example of how to use ProMP
+ * @brief Example of how to use ProMP to learn a MP
  * @version 0.1
  * @date 2023-01-28
  * 
  * @copyright Copyright (c) 2023
  * 
  */
-#include "ProMP/ProMP.hpp"
-#include "dataHandle.hpp"
+#include "ProMP.hpp"
 
 int main(int argc, char** argv)
 {
 
    	std::vector<std::string> fileList;
-	std::string filePath = "../testData/";
+	std::string filePath = "testData/";
 
 	fileList.push_back(filePath + "example1.csv");
 	fileList.push_back(filePath + "example2.csv");
@@ -28,6 +27,9 @@ int main(int argc, char** argv)
 	/// get required trajectory from all demonstrations into a single matrix
 	ProMP_ns::ProMP_Params options;
 	options.demoData = testData.getData();
+	options.bfNum = 35; // Default = 35
+	options.bfStd = 0.0286; // Default = 0.0286
+	options.phaseRate = 0.1; // Default = 1.0
 	options.savePath = filePath;
 
 	/// initialize promp object with number of basis functions and std as arguments.

@@ -3,19 +3,8 @@ project(motionPrimitives)
 
 find_package(Eigen3 REQUIRED)
 
-include_directories(
-    include
-    ${EIGEN3_INCLUDE_DIR}
-)
+list(APPEND MP_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
+list(APPEND MP_INCLUDE_DIRS /include/)
+set(MP_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(ProMP_test src/ProMP/ProMP_Test.cpp
-src/ProMP/ProMP.cpp
-)
-
-target_link_libraries(ProMP_test 
-Eigen3::Eigen
-)
-
-add_library(promp src/ProMP/ProMP.cpp)
-
-install(TARGETS promp DESTINATION /usr/lib)
+add_subdirectory(ProMP)

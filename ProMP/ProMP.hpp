@@ -12,15 +12,14 @@
 #ifndef _PROMP_HPP_
 #define _PROMP_HPP_
 
-#include <vector>
-#include <Eigen/Core>
-#include <Eigen/Dense>
+#include <ostream>
+#include <string>
 #include <vector>
 #include <iostream>
 #include <iomanip>
 #include "dataHandle.hpp"
 
-#define debugging_enabled 1
+#define debugging_enabled 0
 
 #define DEBUG(n,x) do { \
   if (debugging_enabled) { std::cerr << n << x << std::endl; } \
@@ -35,11 +34,21 @@ public:
     int bfNum = 35; 
     double bfStd = 0.0286; 
     double phaseRate = 1.0;
+    
     ProMP_Params(){
     };
+
+
 };
 class ProMP{
 public:
+    
+    /**
+     * @brief construct a new ProMP object
+     * 
+     */
+    ProMP() = default;
+
     /**
      * @brief constructor
      * @param demoData      demo data
@@ -79,6 +88,20 @@ public:
      * @param std       standard deviation
      */
     void addViaPoint(double t, double pointPos, double std);
+    
+    /**
+     * @brief Set the MP's Params
+     * 
+     * @param params params
+     */
+    void setParams(ProMP_Params& params);
+    
+    /**
+     * @brief Get the MP's Params
+     * 
+     * @return ProMP_Params 
+     */
+    ProMP_Params getParams();
 
     /**
      * @brief Generates a trajectory from MP
@@ -89,6 +112,7 @@ public:
     Eigen::MatrixXd generateTraj(int trajLen);
 
 private:
+    
     // Number of Basis Functions
     int bfNum_;
 
@@ -201,12 +225,6 @@ private:
      * 
      */
     void saveMP();
-    /**
-     * @brief load MP parameters from file
-     * 
-     * @param filepath MP param file path
-     */
-    void loadMP(const std::string filepath);
 
     /**
      * @brief create linearly spaced vector 
@@ -273,4 +291,25 @@ private:
     int numTimePoints_;
 };
 }
+
+/**
+ * @brief 
+ * 
+ * @param os 
+ * @param params 
+ * @return std::ostream& 
+ */
+
+inline std::ostream& operator<< (std::ostream &os,ProMP_ns::ProMP_Params &params){
+    os << "MP Parameters\n";
+    os << "-----------------\n";
+    os << "Basis Function Number: " << params.bfNum <<std::endl;
+    os << "Basis Function Standard Deviation: " << params.bfStd <<std::endl;
+    os << "Phase Rate: " << params.phaseRate <<std::endl;
+    os << "Number of Demonstrations: " << params.demoData.size() <<std::endl;
+    //os << "Basis Function Number: " << params.savePath <<std::endl;
+
+    return os;
+}
+
 #endif

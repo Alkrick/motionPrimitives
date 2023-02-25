@@ -10,16 +10,18 @@
  */
 
 
-#include "ProMP/ProMP.hpp"
+#include "ProMP.hpp"
+#include "dataHandle.hpp"
+#include <eigen3/Eigen/src/Core/Matrix.h>
+#include <fstream>
+#include <string>
+#include <sys/select.h>
+#include <vector>
 
 ProMP_ns::ProMP::ProMP(ProMP_Params& params)
 {
     // Unpack params
-    demoTraj_ = params.demoData;
-    bfNum_ = params.bfNum;
-    bfStd_ = params.bfStd;
-    phaseRate_ = params.phaseRate;
-    savePath_ = params.savePath;
+    setParams(params);
     
     // Define Variables
     trajLen_ = demoTraj_[0].rows();
@@ -255,8 +257,22 @@ void ProMP_ns::ProMP::saveMP()
     MPfile.close();
 }
 
-void ProMP_ns::ProMP::loadMP(const std::string filepath)
-{
+void ProMP_ns::ProMP::setParams(ProMP_Params &params){
+    demoTraj_ = params.demoData;
+    bfNum_ = params.bfNum;
+    bfStd_ = params.bfStd;
+    phaseRate_ = params.phaseRate;
+    savePath_ = params.savePath;
+}
+
+ProMP_ns::ProMP_Params ProMP_ns::ProMP::getParams(){
+    ProMP_Params params;
+    params.demoData= demoTraj_ ;
+    params.bfNum= bfNum_ ;
+    params.bfStd= bfStd_ ;
+    params.phaseRate= phaseRate_ ;
+    params.savePath= savePath_ ;
+    return params;
 }
 
 Eigen::VectorXd ProMP_ns::ProMP::linspace(double x0, double xf, int len)

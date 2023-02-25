@@ -45,4 +45,5 @@ _deps
 
 build
 .vscode
+.cache
 [Bb][Uu][Ii][Ll][Dd]/
