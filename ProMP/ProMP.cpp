@@ -244,12 +244,20 @@ Eigen::MatrixXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
 ProMP_ns::ProMP ProMP_ns::ProMP::combine(ProMP &mp1, ProMP &mp2){
     ProMP mix(mp1);
     mix.omMean_ = (mp1.omMean_+mp2.omMean_)/2;
-    // mix.omStd_ = 0;
+    for (int i=0; i<mp1.bfNum_; i++) {
+
+        for (int j=0; j<mp1.bfNum_; j++) {
+            mix.omStd_(i,j) = 1/( (1/mp1.omStd_(i,j))+(1/mp2.omStd_(i,j)));    
+        }
+    }
     return mix;
 }
 
 ProMP_ns::ProMP ProMP_ns::ProMP::blend(ProMP &mp1, ProMP &mp2, Eigen::VectorXd &a){
-    ProMP blend;
+    ProMP blend(mp1);
+    Eigen::VectorXd a_inv = Eigen::VectorXd::Ones(a.size()) - a;
+    blend.omMean_ = a.array() * mp1.omMean_.array() + a_inv.array() * mp2.omMean_.array();
+    blend.omStd_ = mp1.omStd_.array().colwise() * a.array() + mp2.omStd_.array().colwise() * a_inv.array() ;
     return blend;
 }
 
