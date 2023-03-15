@@ -3,9 +3,9 @@
 Library for implementations of different Motion Primitive Models
 
 ## ProMP
-Work is based on [Probabilistic Motion Primitives Alexandros,et al.](https://www.researchgate.net/publication/258620153_Probabilistic_Movement_Primitives)
+Work is based on [Probabilistic Motion Primitives (Alexandros,et al.)](https://www.researchgate.net/publication/258620153_Probabilistic_Movement_Primitives)
 
-Can be used to produce a ProMP model of given trajectory samples, features include:
+Can be used to produce a ProMP model of a trajectory from demonstrations, features include:
 1. Training, saving and loading ProMP models.
 
 <img src="https://user-images.githubusercontent.com/44341275/225205291-eda8c633-30d7-41f3-a5c0-2462190bf01d.png" width="291px">          <img src="https://user-images.githubusercontent.com/44341275/225205317-514b35cd-4b53-4e92-bd04-b5cce342f4ea.png" width="300px">
