@@ -216,8 +216,8 @@ Eigen::MatrixXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
         auto phiT = generateBF(z0,1);
 
         Eigen::VectorXd point(1);
-        point(0) = viaPoints_[i][1];
         Eigen::VectorXd std(1);
+        point(0) = viaPoints_[i][1];
         std(0) = viaPoints_[i][2];
 
         auto aux = std + (phiT.transpose()*new_omStd)*phiT;
@@ -239,6 +239,18 @@ Eigen::MatrixXd ProMP_ns::ProMP::generateTraj(int desiredtrajLen)
         }    
     }
     return genTraj;
+}
+
+ProMP_ns::ProMP ProMP_ns::ProMP::combine(ProMP &mp1, ProMP &mp2){
+    ProMP mix(mp1);
+    mix.omMean_ = (mp1.omMean_+mp2.omMean_)/2;
+    // mix.omStd_ = 0;
+    return mix;
+}
+
+ProMP_ns::ProMP ProMP_ns::ProMP::blend(ProMP &mp1, ProMP &mp2, Eigen::VectorXd &a){
+    ProMP blend;
+    return blend;
 }
 
 void ProMP_ns::ProMP::saveMP()
@@ -284,4 +296,12 @@ Eigen::VectorXd ProMP_ns::ProMP::linspace(double x0, double xf, int len)
         f(i)=x0+i*dx;
     }
     return f;
+}
+
+Eigen::VectorXd ProMP_ns::ProMP::sigmoid(const Eigen::VectorXd& t,double x){
+    Eigen::VectorXd sig(t.size());
+    for (size_t i=0; i<t.size(); i++) {
+        sig(i) = 1.0/(1.0 + exp(-20*( t(i)-x ) ) );
+    }
+    return sig;
 }
